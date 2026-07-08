@@ -11,20 +11,13 @@ description: >-
 
 This skill guides you through auditing a Looker instance using `looker-cli` and System Activity to identify performance bottlenecks, governance gaps, and cleanup opportunities. It flags the violation of best practices and suggests optimal fixes e.g. code snippets or step-by-step guide. 
 
-**IMPORTANT**: When you suggest code snippets or step-by-step guide to update in LookML, you MUST include the exact URL pointing to the specific file and line number(s) of the violation. Construct the full link carefully using the file path, repository URL. Append the line suffix (e.g. #L16 or #L16-L19) to the URL based on the line numbers discovered in the tool output.
-
-> [IMPORTANT]
+> [!IMPORTANT]
 > ## ⚠️ Rules of Engagement (CRITICAL)
-> 1. **System Activity First**: For all operational metrics (Performance, Errors, Usage, Dynamic Fields, Datagroup/PDT operational status), you **MUST** query System Activity or use `looker-cli health` commands.
-> 2. **No Operational File Scans**: Do **NOT** read LookML files to deduce operational state or verify usage history.
-> 3. **Skip Filesystem Grounding**: You are **ALREADY** in the correct environment. Do **NOT** search the filesystem (e.g., `find_by_name`, `ls -R`, or `grep_search`) to locate Looker configuration files, projects, or credentials. Do **NOT** use `find`, `ls`, or `grep` commands/tools under any circumstances for operational audits. Assume `looker-cli` is pre-authenticated and ready.
-> 4. **Immediate Action**: Begin your audit **immediately** using `looker-cli` or API queries. Do not waste turns exploring directory structures or searching for "Looker" keywords in the workspace.
-> 5. **Trust Empty Results**: If a query for violations (e.g., slow queries, dynamic fields > 3) returns an empty list, it means there are **no violations** in that category. Do **NOT** assume the query failed or that data is missing. Do **NOT** pivot to filesystem searches to "find" the violations. Report the clean result clearly.
-> 6. **Stick to Checklist Queries**: Use the provided inline query examples directly. Do **NOT** write complex custom scripts (e.g., Python pipelines) to re-invent logic (e.g., inventorying all fields manually) if a single System Activity query can provide the answer. Simplicity is speed.
-> 7. **Graceful Degradation (Stop Hunting)**: If you identify a violation but cannot retrieve the exact LookML file or line numbers via the API/CLI (e.g., due to 404s or broken connections), **STOP HUNTING**. Do **NOT** pivot to filesystem searches. Report the violation clearly with the identifiers you *do* have (View Name, File Name, Dashboard ID) and state that exact line numbers were inaccessible.
-
-> [!TIP]
-> **Correct File Paths**: If `looker-cli api project project_file` returns empty or 404, do not guess the path. Use `looker-cli api project all_project_files [project_id]` to list all files and their correct paths first.
+> 1. **Strictly API/CLI Only**: All auditing MUST be done via `looker-cli` or System Activity API calls.
+> 2. **NO Filesystem Exploration**: Do **NOT** use `find`, `grep`, `ls`, `code_search`, or `find_by_name` to search the local filesystem. You are already in the correct environment. Assume `looker-cli` is ready.
+> 3. **Immediate Action**: Run your first `looker-cli` command in **Step 1**. Do not waste turns exploring directory structures or reading files.
+> 4. **Trust the API**: If a query returns empty or an error (e.g., connection failed), report that result. Do **NOT** attempt to "fix" it by scanning LookML files or searching the disk.
+> 5. **No Custom Pipelines**: Use the provided inline query examples directly. Do **NOT** write Python scripts or complex pipelines to inventory fields or analyze data if a single query can do it.
 
 
 # 🔁 Execution Workflow
@@ -33,7 +26,7 @@ Follow this three-tiered audit strategy to move from symptoms to structural root
 
 1. **High-level Health audits**: Use Pulse/Vacuum commands for a broad, fast initial assessment (e.g., "Is the instance healthy? What are the top 5 slow things?").
 2. **Drill-down review**: Use System Activity Inline Queries (refer to audit checklist below) for deep drill-downs, specific timeframes (e.g., 90 days vs 7 days), or custom filtering (e.g., filtering by a specific user or custom thresholds).
-3. **Root-Cause Telemetry over Static Metrics**: Do not simply flag an issue. When a bottleneck is identified, immediately trace the root cause by cross-referencing relevant areas and identify what is causing latencies or failures (e.g. tile bloat, un-cached Explores, or missing required partition filters) to help guide developers to fix the underlying LookML. **If LookML issues are suspected, you MUST provide full URLs to the files with line numbers as instructed above.**
+3. **Root-Cause Telemetry over Static Metrics**: Do not simply flag an issue. When a bottleneck is identified, immediately trace the root cause by cross-referencing relevant areas and identify what is causing latencies or failures (e.g. tile bloat, un-cached Explores, or missing required partition filters) to help guide developers to fix the underlying LookML.
 
 
 
