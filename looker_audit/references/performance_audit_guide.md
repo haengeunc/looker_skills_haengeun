@@ -21,24 +21,7 @@ The Looker query execution lifecycle is divided into four distinct, sequential p
 
 - **Identify the slowest dashboards**: find dashboards and looks run in the past 30 days where the total loading time for dashboards is >30 seconds, flag for critical review. If 10-30 seconds, flag as needing review - at risk of users abandoning dashboards.
 
-**Example of Looker CLI to check for average dashboard runtime**
-
-```json
-{
-  "model": "system__activity",
-  "view": "dashboard_performance",
-  "fields": [
-    "dashboard.title",
-    "dashboard_history_stats.avg_runtime"
-  ],
-  "sorts": [
-    "dashboard_history_stats.avg_runtime desc"
-  ],
-  "limit": "10",
-  "column_limit": "50"
-}
-```
-*(Pipe to `looker-cli api query run_inline_query json -`)*
+*(Use `SKILL.md` for actionable CLI commands to check this)*
 
 - **Heavy Dashboards:** use Dashboard System Activity Explore to check “Heavy Dashboards” (dashboard with more than 25 tiles). Flag in the report for review.
 - **Refresh interval:** check for dashboards with auto refresh on and review the refresh interval is no shorter than ETL process update interval. If a short interval is set e.g. minutes or seconds, immediately flag in the report.
@@ -48,25 +31,7 @@ The Looker query execution lifecycle is divided into four distinct, sequential p
   3. If row limit >2000 + dynamic field used, flag as a high risk for browser lag.
   4. If using merge queries, flag to refactor LookML model to join natively in SQL
 
-**Example of Looker CLI to check merged queries run in the last 30 days**
-
-```json
-{
-  "model": "system__activity",
-  "view": "history",
-  "fields": [
-    "history.created_time",
-    "user.name",
-    "result_maker.merge_query_id",
-    "dashboard.title"
-  ],
-  "filters": {
-    "result_maker.is_merge_query": "Yes",
-    "history.created_date": "30 days"
-  },
-  "limit": "500"
-}
-```
+*(Use `SKILL.md` for actionable CLI commands to check merged queries)*
 
 ## Analyse Query Performance
 
@@ -106,35 +71,7 @@ The Looker query execution lifecycle is divided into four distinct, sequential p
   - If end-users are not querying “real-time” data, consider reducing the refresh frequency of your PDTs and staggering their builds throughout the day. 
   - Scan the database connection settings to ensure PDTs leverage warehouse partitioning or clustering
 
-**Example of Looker CLI to review failed PDT:**
-
-```json
-{
-  "model": "system__activity",
-  "view": "pdt_event_log",
-  "fields": [
-    "pdt_event_log.view_name",
-    "pdt_event_log.model_name",
-    "pdt_event_log.pdt_id",
-    "pdt_event_log.action",
-    "pdt_event_log.error_reason",
-    "pdt_event_log.created_time"
-  ],
-  "filters": {
-    "pdt_event_log.action": "%error%",
-    "pdt_event_log.created_date": "24 hours"
-  },
-  "sorts": [
-    "pdt_event_log.created_time desc"
-  ]
-}
-```
-
-**Example of Looker CLI to review failed datagroups:**
-
-```bash
-looker-cli api datagroup all_datagroups | jq '.[] | select(.trigger_error != null) | {name: .name, model: .model_name, error: .trigger_error}'
-```
+*(Use `SKILL.md` for actionable CLI commands to review failed PDTs and datagroups)*
 
 ## Analyse Cache Efficiency
 
@@ -147,29 +84,7 @@ looker-cli api datagroup all_datagroups | jq '.[] | select(.trigger_error != nul
 - **Implement Persistent Derived Tables (PDTs):** For heavy calculations, materialize the logic in the database using PDTs triggered by the same Datagroup. This transfers the query workload from the live dashboard load time onto an automated background schedule.
 - **Reduce Dashboard Tile Density:** Dashboards with 25 or more tiles trigger substantial parallel database requests simultaneously. Restructuring dense dashboards across multiple tabs or utilizing cross-filtering keeps query sizes lean and highly cacheable.
 
-**Example of Looker CLI to check cache vs live-queries:**
-
-```json
-{
-  "model": "system__activity",
-  "view": "history",
-  "fields": [
-    "history.result_source",
-    "history.query_run_count"
-  ],
-  "pivots": [
-    "history.result_source"
-  ],
-  "filters": {
-    "history.result_source": "-NULL",
-    "dashboard.id_as_string": "5",
-    "history.created_date": "30 days"
-  },
-  "sorts": [
-    "history.result_source"
-  ]
-}
-```
+*(Use `SKILL.md` for actionable CLI commands to check cache efficiency)*
 
 ## Audit user & content activity
 
@@ -186,9 +101,4 @@ Review Scheduled Plan System Activity Explore:
   - Identify any contents with “test”, “copy” or “draft” in the title and review if they need to be deleted.
   - Personal folder housekeeping - keep a personal folder for the development/ sandbox exploration stage only. Use a shared folder for production stages that should be managed by BI team. Schedule contents for deletion if not being used.
 
-| Description | Example code |
-| :--- | :--- |
-| Identify unused fields | echo '{"model":"system__activity","view":"field_usage","fields":["field_usage.model","field_usage.explore","field_usage.field"],"filters":{"field_usage.times_used":"0"},"limit":"100"}' \| looker-cli api query run_inline_query json - |
-| Identify unused Explores | echo '{"model":"system__activity","view":"history","fields":["query.model","query.view","history.query_run_count"],"filters":{"history.created_date":"90 days"},"sorts":["history.query_run_count asc"],"limit":"50"}' \| looker-cli api query run_inline_query json - |
-| Compare models queried in the last 60 days vs all models | echo '{"model":"system__activity","view":"history","fields":["query.model","history.query_run_count"],"filters":{"history.created_date":"60 days"},"limit":"100"}' \| looker-cli api query run_inline_query json -<br/>[Compare against all models to identify mode that has not been used in the last 90 days]<br/>looker-cli api lookmlmodel all_lookml_models --fields "name" |
-| Identify unused joins | echo '{"model":"system__activity","view":"field_usage","fields":["field_usage.explore","field_usage.view","field_usage.times_used"],"filters":{"field_usage.times_used":"0"},"limit":"100"}' \| looker-cli api query run_inline_query json - |
+*(See `SKILL.md` for actionable queries to identify unused content)*

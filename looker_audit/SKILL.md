@@ -62,6 +62,14 @@ Excessive complexity on dashboards leads to browser lag and poor user experience
   ```bash
   echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","query.count_of_dynamic_fields"],"filters":{"query.count_of_dynamic_fields":">3"},"sorts":["query.count_of_dynamic_fields desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
   ```
+- **Merged Queries**: Merged queries bypass LookML joins and can be slow. Identify usage in the last 30 days.
+  ```bash
+  echo '{"model":"system__activity","view":"history","fields":["history.created_time","user.name","result_maker.merge_query_id","dashboard.title"],"filters":{"result_maker.is_merge_query":"Yes","history.created_date":"30 days"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+  ```
+- **Dashboard Average Runtime**: Drill down into average runtime beyond the Pulse command.
+  ```bash
+  echo '{"model":"system__activity","view":"dashboard_performance","fields":["dashboard.title","dashboard_history_stats.avg_runtime"],"sorts":["dashboard_history_stats.avg_runtime desc"],"limit":"10"}' | looker-cli api query run_inline_query json - | jq
+  ```
 
 ### 2. Unused LookML Components (Last 90 Days)
 Clean up debt by removing components that aren't being used. Consider Explores/Fields with 0 usage, or Models with very low usage (< 10 queries).
@@ -93,6 +101,10 @@ Ensure data is moving and caching efficiently. Check for stale data (models wher
 - **Failed PDTs**:
   ```bash
   echo '{"model":"system__activity","view":"pdt_event_log","fields":["pdt_event_log.view_name","pdt_event_log.model_name","pdt_event_log.action","pdt_event_log.error_reason","pdt_event_log.created_time"],"filters":{"pdt_event_log.action":"%error%","pdt_event_log.created_date":"24 hours"},"sorts":["pdt_event_log.created_time desc"]}' | looker-cli api query run_inline_query json - | jq
+  ```
+- **Cache Efficiency (Cache Hits vs Live Queries)**: Check the ratio of cache hits. Target > 50% for standard dashboards.
+  ```bash
+  echo '{"model":"system__activity","view":"history","fields":["history.result_source","history.query_run_count"],"pivots":["history.result_source"],"filters":{"history.result_source":"-NULL","history.created_date":"30 days"},"sorts":["history.result_source"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
   ```
 ### 4. LookML Code Quality & Anti-Patterns (Remote Static Analysis)
 Scan remote LookML project files for anti-patterns using `looker-cli`. For more detailed analysis of the LookML review, refer to [LookML Reviewer Skill](lookml_reviewer.md).
