@@ -58,6 +58,7 @@ Excessive complexity on dashboards leads to browser lag and poor user experience
   echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","dashboard.refresh_interval"],"filters":{"dashboard.refresh_interval":"-NULL"},"limit":"100"}' | looker-cli api query run_inline_query json - | jq
   ```
 - **Dynamic Fields**: Excessive dynamic fields (Table Calculations, Custom Fields) bypass LookML governance and strain browser memory.
+  - **CRITICAL**: Do NOT scan LookML files for these; they are defined at the dashboard/tile level. You **MUST** use this **System Activity Inline Query** exclusively.
   - **Concern Thresholds**: > 3 per tile, > 10 per dashboard.
   ```bash
   echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","query.count_of_dynamic_fields"],"filters":{"query.count_of_dynamic_fields":">3"},"sorts":["query.count_of_dynamic_fields desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
@@ -73,6 +74,8 @@ Excessive complexity on dashboards leads to browser lag and poor user experience
 
 ### 2. Unused LookML Components (Last 90 Days)
 Clean up debt by removing components that aren't being used. Consider Explores/Fields with 0 usage, or Models with very low usage (< 10 queries).
+
+- **Workflow**: Rely **exclusively** on System Activity for identifying usage. Do **NOT** scan LookML files to verify usage history.
 
 - **Unused Fields**:
   ```bash
@@ -95,10 +98,12 @@ Clean up debt by removing components that aren't being used. Consider Explores/F
 Ensure data is moving and caching efficiently. Check for stale data (models where max build time is older than DB's max update time).
 
 - **Failed Datagroups**:
+  - **Workflow**: First, check the operational status via the API. If failures are found, **then** inspect the LookML definition to suggest fixes. Do NOT scan LookML files to find failures.
   ```bash
   looker-cli api datagroup all_datagroups | jq '.[] | select(.trigger_error != null) | {name: .name, model: .model_name, error: .trigger_error}'
   ```
 - **Failed PDTs**:
+  - **Workflow**: Check the **operational status** via System Activity first. Only inspect LookML definitions when specific failures are identified to suggest fixes (e.g., syntax errors in SQL).
   ```bash
   echo '{"model":"system__activity","view":"pdt_event_log","fields":["pdt_event_log.view_name","pdt_event_log.model_name","pdt_event_log.action","pdt_event_log.error_reason","pdt_event_log.created_time"],"filters":{"pdt_event_log.action":"%error%","pdt_event_log.created_date":"24 hours"},"sorts":["pdt_event_log.created_time desc"]}' | looker-cli api query run_inline_query json - | jq
   ```
@@ -106,8 +111,12 @@ Ensure data is moving and caching efficiently. Check for stale data (models wher
   ```bash
   echo '{"model":"system__activity","view":"history","fields":["history.result_source","history.query_run_count"],"pivots":["history.result_source"],"filters":{"history.result_source":"-NULL","history.created_date":"30 days"},"sorts":["history.result_source"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
   ```
-### 4. LookML Code Quality & Anti-Patterns (Remote Static Analysis)
-Scan remote LookML project files for anti-patterns using `looker-cli`. For more detailed analysis of the LookML review, refer to [LookML Reviewer Skill](lookml_reviewer.md).
+### 4. LookML Code Quality & Anti-Patterns (Static Analysis)
+Scan LookML project files for anti-patterns. For more detailed analysis of the LookML review, refer to [LookML Reviewer Skill](lookml_reviewer.md).
+
+- **CRITICAL - Local vs. Remote Workflow**:
+  - **Local (Workspace Files Available)**: If you have access to the project files locally in the workspace, you **MUST** prioritise using native tools like `grep_search` and `find_by_name`. Do **NOT** use the `looker-cli` remote loops or shell `grep`.
+  - **Remote Only**: Use the `looker-cli` loops below, but be aware of timeouts. Consider auditing a sample or specific files if the project is large. Clearly show what LookML project has been reviewed, if remote vs local was used.
 
 - **Run Looker Validator**: First, trigger Looker's built-in validator to catch syntax errors and standard issues.
   ```bash
