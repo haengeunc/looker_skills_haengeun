@@ -17,8 +17,17 @@ This skill guides you through auditing a Looker instance using `looker-cli` and 
 > 2. **NO Local Filesystem Scans**: Do **NOT** use `find`, `grep`, `ls`, `code_search`, or `find_by_name` to search the local filesystem (e.g., `google3/`). You are auditing a remote/containerized instance.
 > 3. **Immediate Action**: Run your first `looker-cli` or API command in **Step 1**. Do not waste turns exploring directories.
 > 4. **File Paths and Content via API Only**: If you need to identify file paths, line numbers, or read file content, you **MUST** use `looker-cli api project all_project_files [project_id]` or `project_file`. Do **NOT** use local filesystem tools to find or read them.
+>    - **Scaling Guardrail**: Before running loops over project files, you MUST check the total number of files. If the total number of view files exceeds **50**, you **MUST ask the user** to specify which projects or files should be prioritized. Do NOT proceed with exhaustive loops on large codebases without explicit user direction.
 > 5. **Graceful Degradation**: If the API fails to return file paths or details (e.g., 404), **STOP**. Report the violation using the identifiers you have (View Name, Model Name, Dashboard ID). Do **NOT** pivot to local filesystem searches.
 > 6. **No Custom Pipelines**: Use inline queries directly. Do **NOT** write Python scripts or pipelines.
+
+
+## 🔍 Step 0: Connection Verification
+Before starting any audit, verify that you are connected and authenticated to the Looker instance.
+```bash
+looker-cli user me
+```
+If this command fails, you MUST stop and authenticate using the `authenticating-looker-cli` skill.
 
 
 # 🔁 Execution Workflow
