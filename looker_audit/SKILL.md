@@ -245,9 +245,11 @@ When compiling the audit report, ensure that **Recommendations & Best Practices*
   - **Looker Instance**: The URL of the Looker instance.
   - **Auditor**: The name of the agent and the model used (e.g., `Antigravity (Powered by Gemini 3.1 Flash)`).
 - **Quantify Findings (CRITICAL)**: Do NOT use vague terms like "many" or "several". You **MUST** state the exact count of items found (e.g., "42 inactive accounts", "18 dashboards with 'test' in title").
+- **Illustrate with Examples**: In the findings, provide specific examples of content names, user names, field names, or project names to make the issue concrete (e.g., "61 inactive accounts, such as `John Doe` and `Jane Smith`", or "18 test dashboards, including `[Test] Revenue Dashboard`").
 - **Detail Schedule Hotspots**: When reporting schedule hotspots, specify the exact hour(s) and the volume of jobs (e.g., "Hotspot identified at **8:00 AM** with **150 scheduled jobs**").
 - **Avoid Generic Statements**: Do not just say "Enforce Primary Keys". Instead, say "View `orders` in project `X` is missing a primary key. Add `primary_key: yes` to dimension `id`."
-- **Provide Snippets**: Include code snippets demonstrating the fix.
+- **Provide Actionable Snippets & Tools**: Include code snippets demonstrating the fix or the exact `looker-cli` command the user can run to get the full list of violations.
+- **Suggest System Activity for Detailed Audit**: For recommendations requiring cleanup or deeper investigation, suggest the specific **System Activity Explore** or query parameters the user can use in the Looker UI to get the full list of items (e.g., "Use the **Content Usage System Activity Explore** filtered by `Days Since Last Accessed >= 60` to review all inactive content").
 - **Contextualize**: Link the recommendation to the specific metric or error found (e.g., "The explore `unoptimized_orders_simulation` is slow because of X. Optimize it by Y...").
 - **Direct References (CRITICAL)**: You **MUST** generate explicit hyperlinks for all findings, recommendations, and LookML files mentioned in the report. Use the Looker instance URL base, file paths, and line numbers discovered during the audit to construct direct links to the Looker UI (e.g., `[users.view.lkml](https://<looker-instance>/projects/looker_mcp_demo/files/views/users.view.lkml#L10)` or `[Dashboard Performance](https://<looker-instance>/dashboards/14)`). If referring to System Activity Explores, provide the link to that explore. Do NOT just list file names or identifiers without links.
 
