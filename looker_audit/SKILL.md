@@ -71,28 +71,56 @@ Before running detailed custom queries, you can use pre-packaged `looker-cli hea
 
 ## 📋 Audit Checklist
 
+> [!TIP]
+> **Avoid Limit Truncation (CRITICAL)**: Many System Activity queries below use a `limit` to prevent excessive output. To get the **exact total count** for reporting, you **MUST** run a separate query selecting only the `count` measure (e.g., `user.count`) with the same filters, or count the results in bash/jq if applicable. Do NOT just report the number of rows returned if it matches the limit.
+
+
 ### 1. Dashboard and Looks Health & Complexity
 Excessive complexity on dashboards leads to browser lag and poor user experience. Look for dashboards with > 20 tiles or average query times > 30 seconds.
 
 - **Tile Bloat (Heavy Dashboards)**: Identify dashboards with excessive tiles (> 25).
-  ```bash
-  echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","dashboard_element.count"],"filters":{"dashboard_element.count":">25"},"sorts":["dashboard_element.count desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id"],"filters":{"dashboard_element.count":">25"}}' | looker-cli api query run_inline_query json - | jq 'length'
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","dashboard_element.count"],"filters":{"dashboard_element.count":">25"},"sorts":["dashboard_element.count desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 
 - **Auto-Refresh**: Identify dashboards running unnecessary auto refresh.
-  ```bash
-  echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.title","dashboard.refresh_interval_ordered","user.name","dashboard.id","dashboard_element.count","dashboard_element.count_text","dashboard_element.total_query_tiles"],"filters":{"dashboard.refresh_interval_ordered":"NOT NULL","dashboard.moved_to_trash":"No"},"sorts":["dashboard.refresh_interval_ordered"],"limit":"100"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.count"],"filters":{"dashboard.refresh_interval_ordered":"NOT NULL","dashboard.moved_to_trash":"No"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.title","dashboard.refresh_interval_ordered","user.name","dashboard.id","dashboard_element.count","dashboard_element.count_text","dashboard_element.total_query_tiles"],"filters":{"dashboard.refresh_interval_ordered":"NOT NULL","dashboard.moved_to_trash":"No"},"sorts":["dashboard.refresh_interval_ordered"],"limit":"100"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 - **Dynamic Fields**: Excessive dynamic fields (Table Calculations, Custom Fields) bypass LookML governance and strain browser memory.
   - **CRITICAL**: Do NOT scan LookML files for these; they are defined at the dashboard/tile level. You **MUST** use this **System Activity Inline Query** exclusively.
   - **Concern Thresholds**: > 2 per tile.
-  ```bash
-  echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","query.count_of_dynamic_fields"],"filters":{"query.count_of_dynamic_fields":">2"},"sorts":["query.count_of_dynamic_fields desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count of Dashboards**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id"],"filters":{"query.count_of_dynamic_fields":">2"}}' | looker-cli api query run_inline_query json - | jq 'length'
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","query.count_of_dynamic_fields"],"filters":{"query.count_of_dynamic_fields":">2"},"sorts":["query.count_of_dynamic_fields desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 - **Merged Queries**: Merged queries bypass LookML joins and can be slow. Identify dashboards and Looks currently using them.
-  ```bash
-  echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","dashboard_element.id","result_maker.merge_query_id"],"filters":{"result_maker.is_merge_query":"Yes","dashboard.moved_to_trash":"No"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count of Dashboards**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.count"],"filters":{"result_maker.is_merge_query":"Yes","dashboard.moved_to_trash":"No"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title","dashboard_element.id","result_maker.merge_query_id"],"filters":{"result_maker.is_merge_query":"Yes","dashboard.moved_to_trash":"No"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 - **Dashboard Average Runtime**: Drill down into average runtime of top 10 dashboards to investigate dashboard's latency.
   ```bash
   echo '{"model":"system__activity","view":"dashboard_performance","fields":["dashboard.title","dashboard_history_stats.avg_runtime"],"sorts":["dashboard_history_stats.avg_runtime desc"],"limit":"10"}' | looker-cli api query run_inline_query json - | jq
@@ -117,9 +145,15 @@ Ensure data is moving and caching efficiently. Check for stale data (models wher
   ```
 - **Failed PDTs**:
   - **Workflow**: Check the **operational status** via System Activity first. Only inspect LookML definitions when specific failures are identified to suggest fixes (e.g., syntax errors in SQL).
-  ```bash
-  echo '{"model":"system__activity","view":"pdt_event_log","fields":["pdt_event_log.view_name","pdt_event_log.model_name","pdt_event_log.action","pdt_event_log.error_reason","pdt_event_log.created_time"],"filters":{"pdt_event_log.action":"%error%","pdt_event_log.created_date":"24 hours"},"sorts":["pdt_event_log.created_time desc"]}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"pdt_event_log","fields":["pdt_event_log.count"],"filters":{"pdt_event_log.action":"%error%","pdt_event_log.created_date":"24 hours"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"pdt_event_log","fields":["pdt_event_log.view_name","pdt_event_log.model_name","pdt_event_log.action","pdt_event_log.error_reason","pdt_event_log.created_time"],"filters":{"pdt_event_log.action":"%error%","pdt_event_log.created_date":"24 hours"},"sorts":["pdt_event_log.created_time desc"]}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 - **Cache Efficiency (Cache Hits vs Live Queries)**: Check the ratio of cache hits. Target > 50% for standard dashboards.
   ```bash
   echo '{"model":"system__activity","view":"history","fields":["history.result_source","history.query_run_count"],"pivots":["history.result_source"],"filters":{"history.result_source":"-NULL","history.created_date":"30 days"},"sorts":["history.result_source"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
@@ -129,25 +163,47 @@ Ensure data is moving and caching efficiently. Check for stale data (models wher
 Audit the instance for inactive assets, orphaned schedules, and schedule hotspots using System Activity. Look for high-volume schedules (> 1/hr) or stale schedules (not run in 30 days).
 
 - **Inactive Accounts (No Login in 90 Days)**:
-  ```bash
-  echo '{"model":"system__activity","view":"user","fields":["user.created_date","user.id","user.name","user_facts.last_ui_login_credential_type","user_facts.last_ui_login_date","history.most_recent_query_date"],"filters":{"user_facts.last_ui_login_date":"before 90 days ago","user.is_disabled":"No"},"sorts":["user.created_date desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"user","fields":["user.count"],"filters":{"user_facts.last_ui_login_date":"before 90 days ago","user.is_disabled":"No"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"user","fields":["user.created_date","user.id","user.name","user_facts.last_ui_login_credential_type","user_facts.last_ui_login_date","history.most_recent_query_date"],"filters":{"user_facts.last_ui_login_date":"before 90 days ago","user.is_disabled":"No"},"sorts":["user.created_date desc"],"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 
 - **Inactive Content (Dashboards and Looks Not Queried in 60 Days)**:
   - **Audit Note**: If the title suggests it is an **Annual** or **Quarterly** report, flag this in the audit report so the reviewer can take it into account before deleting or archiving.
-  ```bash
-  echo '{"model":"system__activity","view":"content_usage","fields":["content_usage.content_id","content_usage.content_title","content_usage.content_type","content_usage.api_total","content_usage.embed_total","content_usage.favorites_total","content_usage.other_total","content_usage.schedule_total"],"filters":{"content_usage.days_since_last_accessed":">=60","content_usage.dashboard_deleted":"No","content_usage.look_deleted":"No","content_usage.report_deleted":"No"},"limit":"100"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"content_usage","fields":["content_usage.content_count"],"filters":{"content_usage.days_since_last_accessed":">=60","content_usage.dashboard_deleted":"No","content_usage.look_deleted":"No"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"content_usage","fields":["content_usage.content_id","content_usage.content_title","content_usage.content_type","content_usage.api_total","content_usage.embed_total","content_usage.favorites_total","content_usage.other_total","content_usage.schedule_total"],"filters":{"content_usage.days_since_last_accessed":">=60","content_usage.dashboard_deleted":"No","content_usage.look_deleted":"No"},"limit":"100"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 
 - **Draft/Test/Copy Content (Dashboards)**:
-  ```bash
- echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title"],"filters":{"dashboard.title":"%test%,%copy%,%draft%","dashboard.moved_to_trash":"No"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.count"],"filters":{"dashboard.title":"%test%,%copy%,%draft%","dashboard.moved_to_trash":"No"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"dashboard","fields":["dashboard.id","dashboard.title"],"filters":{"dashboard.title":"%test%,%copy%,%draft%","dashboard.moved_to_trash":"No"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
 
 - **Draft/Test/Copy Content (Looks)**:
-  ```bash
-  echo '{"model":"system__activity","view":"look","fields":["look.id","look.title"],"filters":{"look.title":"%test%,%copy%,%draft%","look.deleted_date":"NULL"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"look","fields":["look.count"],"filters":{"look.title":"%test%,%copy%,%draft%","look.deleted_date":"NULL"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"look","fields":["look.id","look.title"],"filters":{"look.title":"%test%,%copy%,%draft%","look.deleted_date":"NULL"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
 
 
 - **Schedule Hotspots (Peak Hours)**: Identify hours of the day with excessive scheduled jobs.
@@ -156,14 +212,26 @@ Audit the instance for inactive assets, orphaned schedules, and schedule hotspot
   ```
 
 - **Failing Schedules**:
-  ```bash
-  echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_plan.id","scheduled_plan.name","scheduled_job.status","scheduled_job.status_detail"],"filters":{"scheduled_job.status":"failure"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count of Failed Jobs**:
+    ```bash
+    echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_job.count"],"filters":{"scheduled_job.status":"failure"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_plan.id","scheduled_plan.name","scheduled_job.status","scheduled_job.status_detail"],"filters":{"scheduled_job.status":"failure"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 
 - **Orphaned Schedules (Owner is Disabled)**:
-  ```bash
-  echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_plan.id","scheduled_plan.name","user.name"],"filters":{"user.is_disabled":"Yes"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
-  ```
+  - **Total Count**:
+    ```bash
+    echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_plan.count"],"filters":{"user.is_disabled":"Yes"}}' | looker-cli api query run_inline_query json - | jq
+    ```
+  - **Details**:
+    ```bash
+    echo '{"model":"system__activity","view":"scheduled_plan","fields":["scheduled_plan.id","scheduled_plan.name","user.name"],"filters":{"user.is_disabled":"Yes"},"limit":"50"}' | looker-cli api query run_inline_query json - | jq
+    ```
+
 
 > [!NOTE]
 > **Definition-Based Analysis via CLI**: You can also use `looker-cli api scheduledplan all_scheduled_plans` to inspect schedule definitions directly. This is useful for analyzing `crontab` patterns to detect hotspots or checking `user_id` to identify potentially orphaned schedules (cross-reference with disabled users). However, to check **historical failures or execution history**, you MUST use the System Activity `scheduled_job` queries above.
